@@ -1,34 +1,48 @@
-import { createClient } from '@/lib/supabase/server'
-import { notFound } from 'next/navigation'
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import MedicationDetail from './MedicationDetail'
 
-export default async function MedicationPage({ params }: { params: { id: string } }) {
+export default function MedicationPage() {
+  const params = useParams()
+  const router = useRouter()
   const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const [medication, setMedication] = useState<any>(null)
+  const [recentDoses, setRecentDoses] = useState<any[]>([])
+  const [plan, setPlan] = useState('free')
+  const [loading, setLoading] = useState(true)
 
-  const { data: medication } = await supabase
-    .from('medications')
-    .select('*')
-    .eq('id', params.id)
-    .eq('user_id', user!.id)
-    .single()
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.replace('/auth/login'); return }
 
-  if (!medication) notFound()
+      const [medRes, dosesRes, profileRes] = await Promise.all([
+        supabase.from('medications').select('*').eq('id', params.id).eq('user_id', user.id).single(),
+        supabase.from('doses').select('*').eq('medication_id', params.id).order('scheduled_date', { ascending: false }).order('scheduled_time', { ascending: false }).limit(14),
+        supabase.from('profiles').select('plan').eq('id', user.id).single(),
+      ])
 
-  // Last 7 doses
-  const { data: recentDoses } = await supabase
-    .from('doses')
-    .select('*')
-    .eq('medication_id', params.id)
-    .order('scheduled_date', { ascending: false })
-    .order('scheduled_time', { ascending: false })
-    .limit(14)
+      if (!medRes.data) { router.replace('/dashboard/medications'); return }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('plan')
-    .eq('id', user!.id)
-    .single()
+      setMedication(medRes.data)
+      setRecentDoses(dosesRes.data ?? [])
+      setPlan(profileRes.data?.plan ?? 'free')
+      setLoading(false)
+    }
+    load()
+  }, [params.id])
 
-  return <MedicationDetail medication={medication} recentDoses={recentDoses ?? []} plan={profile?.plan ?? 'free'} />
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="text-center">
+        <div className="text-4xl mb-3">💊</div>
+        <p className="text-slate-500 text-sm">Carregando...</p>
+      </div>
+    </div>
+  )
+
+  return <MedicationDetail medication={medication} recentDoses={recentDoses} plan={plan} />
 }
