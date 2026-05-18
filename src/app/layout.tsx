@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { Toaster } from 'react-hot-toast'
 import ServiceWorkerRegistration from '@/components/ServiceWorkerRegistration'
+import OneSignalInit from '@/components/OneSignalInit'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
@@ -30,8 +31,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="manifest" href="/manifest.json" />
       </head>
       <body className="bg-slate-50 text-slate-900 antialiased">
-        {children}
+        <OneSignalInit />
         <ServiceWorkerRegistration />
+        {children}
         <Toaster
           position="top-right"
           toastOptions={{
